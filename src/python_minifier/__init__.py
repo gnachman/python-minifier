@@ -6,8 +6,10 @@ a 'minified' representation of the same source code.
 
 import ast
 import re
+import sys
 
 from python_minifier.ast_compare import CompareError, compare_ast
+from python_minifier.compat import python_source_compat
 from python_minifier.module_printer import ModulePrinter
 from python_minifier.rename import (
     rename_literals,
@@ -59,7 +61,8 @@ def minify(
     preserve_globals=None,
     remove_object_base=True,
     convert_posargs_to_args=True,
-    preserve_shebang=True
+    preserve_shebang=True,
+    minimum_python_version=None
 ):
     """
     Minify a python module
@@ -87,6 +90,8 @@ def minify(
     :param bool remove_object_base: If object as a base class may be removed
     :param bool convert_posargs_to_args: If positional-only arguments will be converted to normal arguments
     :param bool preserve_shebang: Keep any shebang interpreter directive from the source in the minified output
+    :param minimum_python_version: The minimum version of python the minified module should be compatible with as tuple of major and minor version, e.g. (3, 3).
+    :type minimum_python_version: tuple[str, str]
 
     :rtype: str
 
@@ -96,6 +101,14 @@ def minify(
 
     # This will raise if the source file can't be parsed
     module = ast.parse(source, filename)
+
+    if minimum_python_version:
+        if not isinstance(minimum_python_version[0], int) or not isinstance(minimum_python_version[1], int):
+            raise ValueError('minimum_python_version should be a tuple of major and minor version numbers, e.g. (3, 6)')
+        minimum_python_version = max((minimum_python_version[0], minimum_python_version[1]), python_source_compat(module))
+    else:
+        minimum_python_version = python_source_compat(module)
+    sys.stderr.write('Minifying for python >=' + repr(minimum_python_version))
 
     add_namespace(module)
 
@@ -112,7 +125,7 @@ def minify(
         module = RemovePass()(module)
 
     if remove_object_base:
-        module = RemoveObject()(module)
+        module = RemoveObject(minimum_python_version)(module)
 
     bind_names(module)
     resolve_names(module)
@@ -132,7 +145,7 @@ def minify(
     if convert_posargs_to_args:
         module = remove_posargs(module)
 
-    minified = unparse(module)
+    minified = unparse(module, minimum_python_version)
 
     if preserve_shebang is True:
         shebang_line = _find_shebang(source)
@@ -157,22 +170,27 @@ def _find_shebang(source):
 
     return None
 
-def unparse(module):
+def unparse(module, minimum_python_version=None):
     """
     Turn a module AST into python code
 
     This returns an exact representation of the given module,
     such that it can be parsed back into the same AST.
 
+    The minimum python version that should be able to parse the module may be specified.
+    If not specified, the output can be parsed by any support version of python that has the required syntax features.
+
     :param module: The module to turn into python code
     :type: module: :class:`ast.Module`
+    :param minimum_python_version: The minimum python version that should be able to parse the module, as a tuple of minor and major versions. e.g. (2, 7)
+    :type minimum_python_version: tuple[str, str]
     :rtype: str
 
     """
 
     assert isinstance(module, ast.Module)
 
-    printer = ModulePrinter()
+    printer = ModulePrinter(minimum_python_version)
     printer(module)
 
     try:
@@ -208,5 +226,9 @@ def awslambda(source, filename=None, entrypoint=None):
         rename_globals = False
 
     return minify(
-        source, filename, remove_literal_statements=True, rename_globals=rename_globals, preserve_globals=[entrypoint],
+        source,
+        filename,
+        remove_literal_statements=True,
+        rename_globals=rename_globals,
+        preserve_globals=[entrypoint]
     )

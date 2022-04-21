@@ -1,5 +1,5 @@
 import ast
-from typing import List, Text, AnyStr, Optional, Any
+from typing import List, Text, AnyStr, Optional, Any, Tuple
 
 
 class UnstableMinification(RuntimeError):
@@ -19,7 +19,8 @@ def minify(
     preserve_globals: Optional[List[Text]] = ...,
     remove_object_base: bool = ...,
     convert_posargs_to_args: bool = ...,
-    preserve_shebang: bool = ...
+    preserve_shebang: bool = ...,
+    minimum_python_version: Optional[Tuple[str, str]] = ...
 ) -> Text: ...
 
 def unparse(module: ast.Module) -> Text: ...

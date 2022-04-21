@@ -9,14 +9,15 @@ class ExpressionPrinter(object):
     Builds the smallest possible exact representation of an ast
     """
 
-    def __init__(self):
+    def __init__(self, python_min_compatibility=(2, 7)):
+        self.python_min_compatibility = python_min_compatibility
 
         self.code = ''
         self.indent = 0
         self.unicode_literals = False
 
         self.precedences = {
-            'Lambda': 2,  # Lamdda
+            'Lambda': 2,  # Lambda
             'IfExp': 3,  # IfExp
             'comprehension': 3.5,
             'Or': 4,  # BoolOp
@@ -786,7 +787,7 @@ class ExpressionPrinter(object):
         if len(self.code) == 0:
             return
 
-        if self.code[-1] not in '[]{}() :"\'=\n\t<>|^&+-*@/%;,':
+        if self.code[-1] not in '[]{}() :"\'=\n\t<>|^&+-*@/%;,`':
             self.code += ' '
 
     def visit_JoinedStr(self, node):
